@@ -1,0 +1,9 @@
+---
+shows:
+- Homeland
+- The Big Bang Theory
+- Breaking Bad
+- The Walking Dead
+- Game of Thrones
+- Castle
+org_template: ! '** <%s> %s'

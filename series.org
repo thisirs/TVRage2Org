@@ -1,0 +1,13 @@
+#+TODO: TODO | DONE CANCELLED
+#+TODO: QUESTION ANSWERED(@) | FIXED
+#+TODO: BUG | WONTFIX(@) FIX
+
+* Series
+  :PROPERTIES:
+  :CATEGORY: Series
+  :END:
+** <2013-09-30> Homeland
+** <2013-02-08> The Big Bang Theory
+** <2013-07-15> Breaking Bad
+** <2013-02-11> The Walking Dead
+** <2013-04-01> Game of Thrones

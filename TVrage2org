@@ -1,0 +1,16 @@
+#! /bin/bash -
+
+SCRIPT_NAME=`basename $0`
+USER=sylvain
+
+mkdir -p "/home/$USER/deathrow/logs"
+LOG="/home/$USER/deathrow/logs/$SCRIPT_NAME-$(date +%s).log"
+
+exec >$LOG 2>&1
+
+echo "[$(date)] $SCRIPT_NAME starting..."
+
+# No need to bash -c the command
+sudo -u $USER -s bash -c "ruby ~/Dropbox/projects/TVrage2org/main.rb -f ~/Dropbox/projects/TVrage2org/config.yaml -o ~/Dropbox/Org/series.org"
+
+echo "[$(date)] $SCRIPT_NAME done."
