@@ -121,6 +121,9 @@ class Show
     episodes.map do |e|
       time_str = e.air_date.strftime("%Y-%m-%d")
       template = $config["org_template"]
+      if $config["shows"][name] and $config["shows"][name]["org_template"]
+        template = $config["shows"][name]["org_template"]
+      end
       template.gsub("%N", name)
         .gsub("%n", alt_name)
         .gsub("%U", time_str)
@@ -171,6 +174,7 @@ if __FILE__ == $PROGRAM_NAME
 
   $log.level = options[:level]
   $log.info("Log level is set to #{options[:level]}")
+
   $log.info("Load configuration file")
   if options[:conf_file].nil?
     $log.warn("Configuration file not specified, trying ./config.yaml")
@@ -244,13 +248,10 @@ EOS
 
   output.puts(contents)
 
-  $config["shows"].each do |names|
-    if names.is_a? Array
-      name = names.first
-      alt_name = names[1]
-    else
-      name = names
-      alt_name = names
+  $config["shows"].each_pair do |name, opts|
+    alt_name = name
+    if opts and opts["alt_name"]
+      alt_name = opts["alt_name"]
     end
 
     show = database.select { |s| s.name == name }.first
