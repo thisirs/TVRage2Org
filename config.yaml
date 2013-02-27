@@ -1,11 +1,5 @@
 ---
 shows:
-- Homeland
--
-  - The Big Bang Theory
-  - TBBT
-- Breaking Bad
 - The Walking Dead
 - Game of Thrones
-- Castle
 org_template: "** <%U> %n S%SE%E %T"
