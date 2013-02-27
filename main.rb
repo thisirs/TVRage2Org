@@ -18,12 +18,6 @@ class Show
   BASE_URL="http://services.tvrage.com/feeds/search.php?show=%s"
   SEARCH_URL="http://services.tvrage.com/feeds/episodeinfo.php?sid=%d"
 
-  # Minimum days between two checks when no next air date
-  DAYS_UNTIL_NEXT_CHECK = 15
-
-  # Number of days preceding an air date during which we don't recheck
-  DAYS_PRECEDING = 7
-
   attr_accessor :name, :alt_name, :id, :next_eps, :eps_list, :last_check
 
   def initialize(name)
@@ -56,7 +50,7 @@ class Show
         end
       else
         if @last_check and @next_eps.air_date - now < now - @last_check \
-          and @next_eps.air_date > now + DAYS_PRECEDING
+          and @next_eps.air_date > now + $config["days_preceding"]
           $log.debug("Mid date reached or not too close to next air date")
           begin
             @next_eps = retrieve_next_episode
@@ -65,13 +59,14 @@ class Show
             $log.error("Unable to retrieve next episode #{e}")
           end
         else
-          $log.debug("Not at mid date or show in less than #{DAYS_PRECEDING} days")
+          $log.debug("Not at mid date or show in less than %d days" %
+                     $config["days_preceding"])
         end
       end
     else
       $log.debug("No next episode")
-      if not @last_check or now - @last_check > DAYS_UNTIL_NEXT_CHECK
-        $log.debug("More than #{DAYS_UNTIL_NEXT_CHECK} days since last check or no last check")
+      if not @last_check or now - @last_check > $config["days_until_next_check"]
+        $log.debug("More than #{$config["days_until_next_check"]} days since last check or no last check")
         begin
           @next_eps = retrieve_next_episode
           @last_check = now
@@ -205,6 +200,12 @@ if __FILE__ == $PROGRAM_NAME
       exit(1)
     end
   end
+
+  # Minimum days between two checks when no next air date
+  $config["days_until_next_check"] ||= 15
+
+  # Number of days preceding an air date during which we don't recheck
+  $config["days_preceding"] ||= 7
 
   $log.info("Loading database file")
   begin
