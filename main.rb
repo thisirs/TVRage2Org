@@ -9,9 +9,13 @@ require 'yaml'
 require 'fileutils'
 require 'optparse'
 
+class Episode
+  attr_accessor :title, :air_date, :season, :episode
+end
+
 class Show
   BASE_URL="http://services.tvrage.com/feeds/search.php?show=%s"
-  SEARCH_URL="http://services.tvrage.com/feeds/episodeinfo.php?sid=%d&ep=1x01"
+  SEARCH_URL="http://services.tvrage.com/feeds/episodeinfo.php?sid=%d"
 
   # Minimum days between two checks when no next air date
   DAYS_UNTIL_NEXT_CHECK = 15
@@ -19,60 +23,59 @@ class Show
   # Number of days preceding an air date during which we don't recheck
   DAYS_PRECEDING = 7
 
-  attr_accessor :name, :id, :next_air_date, :past_air_dates, :last_check
+  attr_accessor :name, :alt_name, :id, :next_eps, :eps_list, :last_check
 
   def initialize(name)
     @name = name
-    @past_air_dates = []
+    @eps_list = []
     @id = nil
-    @next_air_date = nil
     @last_check = nil
   end
 
   # Update next air date if needed. Depends on last check and next air
   # date if any.
-  def update_next_air_date
-    $log.debug("Update next air date for show #{@name}")
-    $log.debug("Next air date is #{@next_air_date || "nil"}")
+  def update_next_episode
+    $log.debug("Update next episode for show #{@name}")
     $log.debug("Last check date is #{@last_check || "nil"}")
 
     now = DateTime.now
     $log.debug("Now is #{now}")
 
-    if @next_air_date
-      if @next_air_date < now
-        $log.debug("Next air date is past")
+    if @next_eps
+      $log.debug("Next episode present")
+      if @next_eps.air_date < now
+        $log.debug("Next episode is past")
         begin
-          date = retrieve_next_air_date
-          @past_air_dates << @next_air_date
+          eps = retrieve_next_episode
+          @eps_list << @next_eps
           @last_check = now
-          @next_air_date = date
-        rescue
-          $log.error("Unable to retrieve next air date")
+          @next_eps = eps
+        rescue Exception => e
+          $log.error("Unable to retrieve next episode #{e}")
         end
       else
-        if @last_check and @next_air_date - now < now - @last_check \
-          and @next_air_date > now + DAYS_PRECEDING
+        if @last_check and @next_eps.air_date - now < now - @last_check \
+          and @next_eps.air_date > now + DAYS_PRECEDING
           $log.debug("Mid date reached or not too close to next air date")
           begin
-            @next_air_date = retrieve_next_air_date
+            @next_eps = retrieve_next_episode
             @last_check = now
-          rescue
-            $log.error("Unable to retrieve next air date")
+          rescue Exception => e
+            $log.error("Unable to retrieve next episode #{e}")
           end
         else
           $log.debug("Not at mid date or show in less than #{DAYS_PRECEDING} days")
         end
       end
     else
-      $log.debug("No next air date")
+      $log.debug("No next episode")
       if not @last_check or now - @last_check > DAYS_UNTIL_NEXT_CHECK
         $log.debug("More than #{DAYS_UNTIL_NEXT_CHECK} days since last check or no last check")
         begin
-          @next_air_date = retrieve_next_air_date
+          @next_eps = retrieve_next_episode
           @last_check = now
-        rescue
-          $log.error("Unable to retrieve next air date")
+        rescue Exception => e
+          $log.error("Unable to retrieve next episode #{e}")
         end
       else
         $log.debug("No need to check again")
@@ -80,29 +83,54 @@ class Show
     end
   end
 
-  def retrieve_next_air_date
-    $log.debug("Retrieving next air date for show #{name}...")
+  def retrieve_next_episode
+    $log.debug("Retrieving next #{name} episode...")
+
     unless @id
-      $log.debug("Retrieving ID")
+      $log.debug("No ID, retrieving...")
       doc = Nokogiri::XML(open(BASE_URL % CGI::escape(name)))
       @id = doc.xpath("/Results/show[1]/showid").text.to_i
     end
+
     $log.debug("Id is #{@id}")
     doc = Nokogiri::XML(open(SEARCH_URL % @id))
+    eps = Episode.new
+
     sec = doc.xpath("/show/nextepisode/airtime[@format='GMT+0 NODST']").text.to_i
-    $log.debug("Raw date is #{sec}")
-    date = Time.at(sec).to_datetime
-    $log.debug("Next air date is #{date || nil}")
-    date
+    eps.air_date = Time.at(sec).to_datetime
+    $log.debug("Air date is #{eps.air_date || "nil"}")
+
+    eps.title = doc.xpath("/show/nextepisode/title").text
+    $log.debug("Title is #{eps.title || "nil"}")
+
+    number = doc.xpath("/show/nextepisode/number").text
+    if number =~ /(\d)+x(\d)+/
+      eps.season = $1.to_i
+      eps.episode = $2.to_i
+    end
+    $log.debug("Season is #{eps.season || "nil"}")
+    $log.debug("Episode is #{eps.episode || "nil"}")
+
+    eps
   end
 
   def to_org(prev = nil)
-    dates = [@next_air_date]
-    dates = dates + past_air_dates if prev
+    if @next_eps
+      episodes = [@next_eps]
+    else
+      episodes = []
+    end
+    episodes = episodes + @eps_list if prev
 
-    dates.map do |d|
-      time_str = d.strftime("%Y-%m-%d")
-      $config["org_template"] % [time_str, name]
+    episodes.map do |e|
+      time_str = e.air_date.strftime("%Y-%m-%d")
+      template = $config["org_template"]
+      template.gsub("%N", name)
+        .gsub("%n", alt_name)
+        .gsub("%U", time_str)
+        .gsub("%T", e.title)
+        .gsub("%S", "%02d" % e.season)
+        .gsub("%E", "%02d" % e.episode)
     end.join("\n")
   end
 end
@@ -151,7 +179,7 @@ if __FILE__ == $PROGRAM_NAME
       $config = YAML.load_file("/etc/TVrage2org.conf")
     rescue
       $log.error("Unable to load file \"/etc/TVrage2org.conf\"")
-      $config = {"shows" => [], "org_template" => "** <%s> %s"}
+      $config = {"shows" => [], "org_template" => "** <%U> %N S%SE%E %T"}
     end
   end
 
@@ -175,21 +203,31 @@ if __FILE__ == $PROGRAM_NAME
   contents = File.read(CONFIG_PATH + "/head.org")
   output.puts(contents)
 
-  $config["shows"].each do |name|
+  $config["shows"].each do |names|
+    if names.is_a? Array
+      name = names.first
+      alt_name = names[1]
+    else
+      name = names
+      alt_name = names
+    end
+
     show = database.select { |s| s.name == name }.first
 
     # Add if not in database
     unless show
       $log.debug("Adding #{name} to database")
       show = Show.new(name)
+      show.alt_name = alt_name
       database << show
     end
 
-    # Update next_air_date if necessary
-    show.update_next_air_date
+    # Update next episode if necessary
+    show.update_next_episode
 
     # Write air dates
-    output.puts show.to_org
+    $log.debug("Org heading is #{show.to_org}")
+    output.puts show.to_org(:all)
   end
 
   output.close if output.is_a? File
