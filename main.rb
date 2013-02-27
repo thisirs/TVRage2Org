@@ -8,6 +8,7 @@ require 'logger'
 require 'yaml'
 require 'fileutils'
 require 'optparse'
+require 'pp'
 
 class Episode
   attr_accessor :title, :air_date, :season, :episode
@@ -142,6 +143,9 @@ if __FILE__ == $PROGRAM_NAME
   DATABASE_PATH = CONFIG_PATH + "/" + DATABASE_FILE
 
   $log = Logger.new(STDERR)
+  $log.formatter = proc do |severity, datetime, progname, msg|
+    "#{severity}: #{msg}\n"
+  end
 
   options = {}
 
@@ -149,7 +153,7 @@ if __FILE__ == $PROGRAM_NAME
     opts.banner = "Usage: TVrage2org.rb [OPTIONS]"
 
     opts.on("-f", "--config CONFIG-FILE", "YAML conf file") do |f|
-      options[:conf_file] = File.expand_path(f) || "/etc/TVrage2org.conf"
+      options[:conf_file] = File.expand_path(f)
     end
 
     opts.on("-o", "--org-file ORG-FILE", "Org output file") do |f|
@@ -157,8 +161,9 @@ if __FILE__ == $PROGRAM_NAME
     end
 
     levels = [:fatal, :error, :warn, :info, :debug]
-    opts.on("-d", "--debug LEVEL", levels, "Debug level") do |level|
-      options[:level] = Logger::const_get(level) || Logger::UNKNOWN
+    options[:level] = Logger::WARN
+    opts.on("-d", "--debug LEVEL", levels, "Debug level (default is warn)") do |level|
+      options[:level] = Logger::Severity.const_get(level.upcase)
     end
 
     opts.on( '-h', '--help', 'Display this screen' ) do
@@ -169,26 +174,44 @@ if __FILE__ == $PROGRAM_NAME
 
   options_parser.parse!
 
-  begin
-    $log.debug("Loading \"#{options[:conf_file]}\"")
-    $config = YAML.load_file(options[:conf_file])
-  rescue
-    $log.error("Unable to load file \"#{options[:conf_file]}\"")
+  $log.level = options[:level]
+  $log.info("Log level is set to #{options[:level]}")
+  $log.info("Load configuration file")
+  if options[:conf_file].nil?
+    $log.warn("Configuration file not specified, trying ./config.yaml")
+    options[:conf_file] = "./config.yaml"
     begin
-      $log.debug("Loading \"/etc/TVrage2org.conf\"")
-      $config = YAML.load_file("/etc/TVrage2org.conf")
+      $log.debug("Loading #{options[:conf_file]}")
+      $config = YAML.load_file(options[:conf_file])
     rescue
-      $log.error("Unable to load file \"/etc/TVrage2org.conf\"")
-      $config = {"shows" => [], "org_template" => "** <%U> %N S%SE%E %T"}
+      $log.error("Unable to load configuration file %s, trying %s" %
+                 [options[:conf_file], CONFIG_PATH + "/config.yaml"])
+      options[:conf_file] = CONFIG_PATH + "/config.yaml"
+      begin
+        $config = YAML.load_file(options[:conf_file])
+      rescue
+        $log.fatal("Unable to load configuration file %s, exiting" %
+                   [CONFIG_PATH + "/config.yaml"])
+        exit(1)
+      end
+    end
+  else
+    begin
+      $log.info("Loading #{options[:conf_file]}")
+      $config = YAML.load_file(options[:conf_file])
+    rescue
+      $log.fatal("Unable to load configuration file %s, exiting" %
+                 options[:conf_file])
+      exit(1)
     end
   end
 
+  $log.info("Loading database file")
   begin
     database = YAML.load_file(DATABASE_PATH)
   rescue
-    $log.error("Unable to load file \"#{DATABASE_PATH}\"")
-  ensure
-    database = [] unless database.is_a?(Array)
+    $log.error("Unable to load database file #{DATABASE_PATH}, a new one will be created")
+    database = []
   end
 
   # Where Org file contents will be written
@@ -198,9 +221,26 @@ if __FILE__ == $PROGRAM_NAME
     else
       STDOUT
     end
+  $log.info("Org data will be written on #{output.pretty_inspect.chop}")
 
-  # Write org file header
-  contents = File.read(CONFIG_PATH + "/head.org")
+  $log.info("Loading Org header file")
+  begin
+    contents = File.read(CONFIG_PATH + "/head.org")
+  rescue
+    $log.warn("Unable to load Org header file #{CONFIG_PATH + "/head.org"}")
+    $log.warn("Writing a default one")
+    contents = <<EOS
+* Series
+  :PROPERTIES:
+  :CATEGORY: Series
+  :END:
+EOS
+    FileUtils.mkdir_p(CONFIG_PATH)
+    File.open(CONFIG_PATH + "/head.org", 'w') do |f|
+      f.puts contents
+    end
+  end
+
   output.puts(contents)
 
   $config["shows"].each do |names|
@@ -233,6 +273,7 @@ if __FILE__ == $PROGRAM_NAME
   output.close if output.is_a? File
 
   # Save database
+  $log.info("Saving database")
   FileUtils.mkdir_p(CONFIG_PATH)
   File.open(DATABASE_PATH, "w") { |f| f.write(database.to_yaml) }
 end
