@@ -4,7 +4,8 @@ SCRIPT_NAME=`basename $0`
 USER=sylvain
 
 mkdir -p "/home/$USER/deathrow/logs"
-LOG="/home/$USER/deathrow/logs/$SCRIPT_NAME-$(date +%s).log"
+DATE=$(date "+%Y-%m-%d_%H:%M:%S")
+LOG="/home/$USER/deathrow/logs/$SCRIPT_NAME-$DATE.log"
 
 exec >$LOG 2>&1
 
