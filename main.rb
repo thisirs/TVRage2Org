@@ -100,7 +100,7 @@ class Show
     $log.debug("Title is #{eps.title || "nil"}")
 
     number = doc.xpath("/show/nextepisode/number").text
-    if number =~ /(\d)+x(\d)+/
+    if number =~ /(\d+)x(\d+)/
       eps.season = $1.to_i
       eps.episode = $2.to_i
     end
