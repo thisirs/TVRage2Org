@@ -6,5 +6,6 @@ shows:
   The Big Bang Theory:
     alt_name: "TBBT"
 org_template: "** <%U> %n S%SE%E %T"
+time_format: "%Y-%m-%d %H:%M"
 days_until_next_check: 15
 days_preceding: 7

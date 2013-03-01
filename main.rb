@@ -122,8 +122,13 @@ class Show
     episodes = episodes + @eps_list if prev
 
     episodes.map do |e|
-      time_str = e.air_date.strftime("%Y-%m-%d")
-      template = $config["org_template"]
+      time_format = $config["time_format"] || "%Y-%m-%d"
+      if $config["shows"][name] and $config["shows"][name]["time_format"]
+        time_format = $config["shows"][name]["time_format"]
+      end
+
+      time_str = e.air_date.strftime(time_format)
+      template = $config["org_template"] || "** <%U> %n S%SE%E %T"
       if $config["shows"][name] and $config["shows"][name]["org_template"]
         template = $config["shows"][name]["org_template"]
       end
