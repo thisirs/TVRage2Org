@@ -103,6 +103,9 @@ class Show
     if number =~ /(\d+)x(\d+)/
       eps.season = $1.to_i
       eps.episode = $2.to_i
+    else
+      $log.fatal("Unable to parse number, exiting")
+      exit(1)
     end
     $log.debug("Season is #{eps.season || "nil"}")
     $log.debug("Episode is #{eps.episode || "nil"}")
