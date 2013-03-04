@@ -50,7 +50,7 @@ class Show
         end
       else
         if @last_check and @next_eps.air_date - now < now - @last_check \
-          and @next_eps.air_date > now + $config["days_preceding"]
+          and @next_eps.air_date > now + get_option("days_preceding")
           $log.debug("Mid date reached or not too close to next air date")
           begin
             @next_eps = retrieve_next_episode
@@ -60,13 +60,13 @@ class Show
           end
         else
           $log.debug("Not at mid date or show in less than %d days" %
-                     $config["days_preceding"])
+                     get_option("days_preceding"))
         end
       end
     else
       $log.debug("No next episode")
-      if not @last_check or now - @last_check > $config["days_until_next_check"]
-        $log.debug("More than #{$config["days_until_next_check"]} days since last check or no last check")
+      if not @last_check or now - @last_check > get_option("days_until_next_check")
+        $log.debug("More than #{get_option("days_until_next_check")} days since last check or no last check")
         begin
           @next_eps = retrieve_next_episode
           @last_check = now
@@ -113,6 +113,21 @@ class Show
     eps
   end
 
+  def get_option(option)
+    value = $config[option]
+    if value.nil?
+      $log.warn("Option '%s' not present in configuration file" % option)
+      $log.warn("Defaulting to #{$default[option]}")
+      value = $default[option]
+    end
+    unless $config["shows"][name].nil? or $config["shows"][name][option].nil?
+      $log.debug("Per show value defined")
+      value = $config["shows"][name][option]
+    end
+    $log.debug("Option #{option} is #{value}")
+    value
+  end
+
   def to_org(prev = nil)
     if @next_eps
       episodes = [@next_eps]
@@ -122,16 +137,10 @@ class Show
     episodes = episodes + @eps_list if prev
 
     episodes.map do |e|
-      time_format = $config["time_format"] || "%Y-%m-%d"
-      if $config["shows"][name] and $config["shows"][name]["time_format"]
-        time_format = $config["shows"][name]["time_format"]
-      end
-
+      time_format = get_option("time_format")
       time_str = e.air_date.strftime(time_format)
-      template = $config["org_template"] || "** <%U> %n S%SE%E %T"
-      if $config["shows"][name] and $config["shows"][name]["org_template"]
-        template = $config["shows"][name]["org_template"]
-      end
+
+      template = get_option("org_template")
       template.gsub("%N", name)
         .gsub("%n", alt_name)
         .gsub("%U", time_str)
