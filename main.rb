@@ -162,6 +162,24 @@ if __FILE__ == $PROGRAM_NAME
     "#{severity}: #{msg}\n"
   end
 
+  $default = {
+    "org_template" => "** <%U> %n S%SE%E %T",
+    "time_format" => "%Y-%m-%d %H:%M",
+
+    # Minimum days between two checks when no next air date
+    "days_until_next_check" => 15,
+
+    # Number of days preceding an air date during which we don't recheck
+    "days_preceding" => 7,
+    "show_all" => true,
+    "head" => <<EOS
+* Series
+  :PROPERTIES:
+  :CATEGORY: Series
+  :END:
+EOS
+  }
+
   options = {}
 
   options_parser = OptionParser.new do |opts|
@@ -222,12 +240,6 @@ if __FILE__ == $PROGRAM_NAME
     end
   end
 
-  # Minimum days between two checks when no next air date
-  $config["days_until_next_check"] ||= 15
-
-  # Number of days preceding an air date during which we don't recheck
-  $config["days_preceding"] ||= 7
-
   $log.info("Loading database file")
   begin
     database = YAML.load_file(DATABASE_PATH)
@@ -251,12 +263,7 @@ if __FILE__ == $PROGRAM_NAME
   rescue
     $log.warn("Unable to load Org header file #{CONFIG_PATH + "/head.org"}")
     $log.warn("Writing a default one")
-    contents = <<EOS
-* Series
-  :PROPERTIES:
-  :CATEGORY: Series
-  :END:
-EOS
+    contents = $default["head"]
     FileUtils.mkdir_p(CONFIG_PATH)
     File.open(CONFIG_PATH + "/head.org", 'w') do |f|
       f.puts contents
@@ -284,9 +291,20 @@ EOS
     # Update next episode if necessary
     show.update_next_episode
 
+    # Write header if any
+    if $config["shows"][show.name] and $config["shows"][show.name]["head"]
+      header = $config["shows"][show.name]["head"]
+      output.puts(header)
+      $log.debug("Org header is #{header}")
+    else
+      $log.debug("No Org header")
+    end
+
+    show_all = show.get_option("show_all")
+
     # Write air dates
-    $log.debug("Org heading is #{show.to_org}")
-    output.puts show.to_org(:all)
+    $log.debug("Org heading is #{show.to_org(show_all)}")
+    output.puts show.to_org(show_all)
   end
 
   output.close if output.is_a? File
