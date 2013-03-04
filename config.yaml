@@ -2,10 +2,12 @@
 shows:
   The Walking Dead:
   Game of thrones:
-    org_template: "** Game of Thrones <%U>"
+    head: "** Game of Thrones episodes!"
+    org_template: "*** Game of Thrones <%U>"
   The Big Bang Theory:
     alt_name: "TBBT"
 org_template: "** <%U> %n S%SE%E %T"
 time_format: "%Y-%m-%d %H:%M"
 days_until_next_check: 15
 days_preceding: 7
+show_all: true
