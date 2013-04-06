@@ -14,6 +14,9 @@ class Episode
   attr_accessor :title, :air_date, :season, :episode
 end
 
+class InvalidEpisode < StandardError
+end
+
 class Show
   BASE_URL="http://services.tvrage.com/feeds/search.php?show=%s"
   SEARCH_URL="http://services.tvrage.com/feeds/episodeinfo.php?sid=%d"
@@ -40,23 +43,24 @@ class Show
       $log.debug("Next episode present")
       if @next_eps.air_date < now
         $log.debug("Next episode is past")
+        @eps_list << @next_eps
+        @last_check = now
         begin
           eps = retrieve_next_episode
-          @eps_list << @next_eps
-          @last_check = now
           @next_eps = eps
-        rescue Exception => e
-          $log.error("Unable to retrieve next episode #{e}")
+        rescue InvalidEpisode => e
+          $log.error(e.message)
+          @next_eps = nil
         end
       else
         if @last_check and @next_eps.air_date - now < now - @last_check \
           and @next_eps.air_date > now + get_option("days_preceding")
           $log.debug("Mid date reached or not too close to next air date")
           begin
-            @next_eps = retrieve_next_episode
             @last_check = now
-          rescue Exception => e
-            $log.error("Unable to retrieve next episode #{e}")
+            @next_eps = retrieve_next_episode
+          rescue InvalidEpisode => e
+            $log.error(e.message)
           end
         else
           $log.debug("Not at mid date or show in less than %d days" %
@@ -68,10 +72,10 @@ class Show
       if not @last_check or now - @last_check > get_option("days_until_next_check")
         $log.debug("More than #{get_option("days_until_next_check")} days since last check or no last check")
         begin
-          @next_eps = retrieve_next_episode
           @last_check = now
-        rescue Exception => e
-          $log.error("Unable to retrieve next episode #{e}")
+          @next_eps = retrieve_next_episode
+        rescue InvalidEpisode => e
+          $log.error(e.message)
         end
       else
         $log.debug("No need to check again")
@@ -80,35 +84,57 @@ class Show
   end
 
   def retrieve_next_episode
-    $log.debug("Retrieving next #{name} episode...")
+    $log.debug("Retrieving next \"#{name}\" episode data")
 
     unless @id
       $log.debug("No ID, retrieving...")
-      doc = Nokogiri::XML(open(BASE_URL % CGI::escape(name)))
-      @id = doc.xpath("/Results/show[1]/showid").text.to_i
+      begin
+        doc = Nokogiri::XML(open(BASE_URL % CGI::escape(name)))
+        @id = doc.xpath("/Results/show[1]/showid").text.to_i
+      rescue
+        raise InvalidEpisode.new("Unable to retrieve id")
+      end
     end
 
     $log.debug("Id is #{@id}")
-    doc = Nokogiri::XML(open(SEARCH_URL % @id))
     eps = Episode.new
 
-    sec = doc.xpath("/show/nextepisode/airtime[@format='GMT+0 NODST']").text.to_i
+    begin
+      doc = Nokogiri::XML(open(SEARCH_URL % @id))
+      sec = doc.xpath("/show/nextepisode/airtime[@format='GMT+0 NODST']").text.to_i
+    rescue
+      raise InvalidEpisode.new("Unable to parse date")
+    end
+
     eps.air_date = Time.at(sec).to_datetime
+
     $log.debug("Air date is #{eps.air_date || "nil"}")
+    if eps.air_date.nil? or eps.air_date < DateTime.now
+      raise InvalidEpisode.new("Invalid date")
+    end
 
-    eps.title = doc.xpath("/show/nextepisode/title").text
-    $log.debug("Title is #{eps.title || "nil"}")
+    begin
+      eps.title = doc.xpath("/show/nextepisode/title").text
+    rescue
+      raise InvalidEpisode.new("Unable to parse title")
+    end
 
-    number = doc.xpath("/show/nextepisode/number").text
+    $log.debug("Title is \"#{eps.title || "nil"}\"")
+
+    begin
+      number = doc.xpath("/show/nextepisode/number").text
+    rescue
+      raise InvalidEpisode.new("Unable to parse episode number")
+    end
+
     if number =~ /(\d+)x(\d+)/
       eps.season = $1.to_i
       eps.episode = $2.to_i
     else
-      $log.fatal("Unable to parse number, exiting")
-      exit(1)
+      raise InvalidEpisode.new("Invalid episode number")
     end
-    $log.debug("Season is #{eps.season || "nil"}")
-    $log.debug("Episode is #{eps.episode || "nil"}")
+    $log.debug("Season is #{eps.season}")
+    $log.debug("Episode is #{eps.episode}")
 
     eps
   end
