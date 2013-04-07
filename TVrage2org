@@ -12,6 +12,6 @@ exec >$LOG 2>&1
 echo "[$(date)] $SCRIPT_NAME starting..."
 
 # No need to bash -c the command
-sudo -u $USER -s bash -c "ruby ~/Dropbox/projects/TVrage2org/main.rb -f ~/Dropbox/projects/TVrage2org/config.yaml -o ~/Dropbox/Org/series.org"
+sudo -u $USER -s bash -c "ruby ~/Dropbox/projects/TVrage2org/main.rb -f ~/.config/TVrage2org/config.yaml -o ~/Dropbox/Org/series.org -d debug"
 
 echo "[$(date)] $SCRIPT_NAME done."
