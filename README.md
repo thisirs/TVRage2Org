@@ -15,11 +15,15 @@ Your favourite shows are stored in a
 
 Custom configuration file, no debug messages and results in an org file:
 
-    ruby main.rb -f myconfigfile.yaml 2> /dev/null > ~/Org/series.org
+```bash
+ruby main.rb -f myconfigfile.yaml 2> /dev/null > ~/Org/series.org
+```
 
 Same thing with the -o option:
 
-    ruby main.rb -f myconfigfile.yaml -o ~/Org/series.org
+```bash
+ruby main.rb -f myconfigfile.yaml -o ~/Org/series.org
+```
 
 This script is likely to be run by a cron task. As an example, I
 place the bash script [TVrage2org](TVrage2org) in /etc/cron.daily/.
