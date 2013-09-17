@@ -1,4 +1,4 @@
-# TVRage2Org
+# TVRage2Org (deprecated in favor of event_scraper)
 
 TVRage2Org is a ruby script that automatically fetches your favourite
 shows on [TVRage](http://www.tvrage.com) and make it into an
